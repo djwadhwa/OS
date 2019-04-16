@@ -2,10 +2,11 @@
 #include  <stdio.h>
 // #include  <string.h>
 #include <unistd.h>
-// #include <sys/types.h>
+#include <sys/wait.h>
 
 // DJ Wadhwa
 // 04/14/2019
+
 int main (int argc, char **argv)
 {
   pid_t pid;
@@ -28,14 +29,6 @@ int main (int argc, char **argv)
  * 5 pipe2 in
  * 6 pipe2 out
  */
-  if (pipe (pipe1)<0){
-    //create first pipe
-    perror("Error creating pipe between child and grandchild.");
-  }
-  if (pipe (pipe2)<0){
-    //create second pipe
-    perror("Error creating pipe between grandchild and great-grandchild.");
-  }
 
   if ((pid = fork()) < 0) //fork and create child
   {
@@ -43,6 +36,14 @@ int main (int argc, char **argv)
   }
   else if (pid == 0)
   {
+    if (pipe (pipe1)<0){
+      //create first pipe
+      perror("Error creating pipe between child and grandchild.");
+    }
+    if (pipe (pipe2)<0){
+      //create second pipe
+      perror("Error creating pipe between grandchild and great-grandchild.");
+    }
     if ((pid = fork())< 0) //fork and create grandchild
     {
       perror("Grandchild process could not be created."); //fork failure error
@@ -54,14 +55,13 @@ int main (int argc, char **argv)
         perror("Great-grandchild process could not be created.");
       }
       else if (pid == 0)
-      { //child
-
-        close (pipe2[RD]); //close pipe 2 read
-        close (pipe2[WR]); //close pipe 2 write since pipe 2 is not used at all
-
-        close (pipe1[WR]); // close pipe 1 write, because nothing is being written only read
-        dup2(pipe1[RD], 0); //redirect pipe 1 read to stdin to take "grep" output as input
-        execlp ("wc", "wc", "-l", NULL); //execute word count
+      {
+        //great Grandchild
+        close (pipe1[RD]); //close pipe 2 read
+        close (pipe1[WR]); //close pipe 2 write since pipe 2 is not used at all
+        close (pipe2[RD]); // close pipe 1 write, because nothing is being written only read
+        dup2(pipe2[WR], 1); //redirect pipe 1 read to stdin to take "grep" output as input
+        execlp ("ps", "ps", "-A", NULL); //execute word count
       }
       else
       {
@@ -78,11 +78,11 @@ int main (int argc, char **argv)
     else
     {
       //great-grandchild
-      close (pipe1 [RD]); //close pipe 1 read
-      close (pipe1[WR]); //close pipe 1 write, because pipe 1 is not being used at all
-      close(pipe2[RD]); //close pipe 2 read because nothing is being read only written
-      dup2 (pipe2[WR], 1); //redirect pipe 2 write to std out to output ps command
-      execlp("ps", "ps", "-A", NULL); //execute ps command listing all running processes
+      close (pipe2[RD]); //close pipe 1 read
+      close (pipe2[WR]); //close pipe 1 write, because pipe 1 is not being used at all
+      close(pipe1[WR]); //close pipe 2 read because nothing is being read only written
+      dup2 (pipe1[RD], 0); //redirect pipe 2 write to std out to output ps command
+      execlp("wc", "wc", "-l", NULL); //execute ps command listing all running processes
     }
   }
   else
